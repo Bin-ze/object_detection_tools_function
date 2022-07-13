@@ -34,6 +34,7 @@ class Voc_split_trainval:
         fval = open(self.txtsavepath + '/val.txt', 'w')
 
         for i in list:
+            if total_xml[i][-4:] != '.xml': continue
             name = total_xml[i][:-4] + '\n'
             if i in trainval:
                 ftrainval.write(name)
