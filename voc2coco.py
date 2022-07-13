@@ -31,7 +31,8 @@ class Voc_to_coco:
     @staticmethod
     def object_classes():
         """
-        :return: 静态方法，手动填入标注数据集的类别
+        静态方法，手动填入标注数据集的类别
+        :return:
         """
         return ['car']
 
