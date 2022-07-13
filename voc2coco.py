@@ -11,9 +11,17 @@ from glob import glob
 from tqdm import tqdm
 from PIL import Image
 
+'''
+xml format to json format 
+'''
 class Voc_to_coco:
 
     def __init__(self, xml_path, img_path, out_file):
+        """
+        :param xml_path: voc 标注目录
+        :param img_path: voc 图片目录
+        :param out_file: json 文件保存路径
+        """
         self.xml_path = xml_path
         self.img_path = img_path
         self.out_file = out_file
@@ -21,16 +29,28 @@ class Voc_to_coco:
         logging.info(self.label_ids)
 
     @staticmethod
-    def object_classes():  # 这里定义了自己的数据集的目标类别
+    def object_classes():
+        """
+        :return: 静态方法，手动填入标注数据集的类别
+        """
         return ['car']
 
     @staticmethod
     def get_segmentation(points):
-
+        """
+        :param points: [xmin, ymin ,w, h]
+        :return: bbox segmentation
+        """
         return [points[0], points[1], points[2] + points[0], points[1],
                  points[2] + points[0], points[3] + points[1], points[0], points[3] + points[1]]
 
     def parse_xml(self, xml_path, img_id, anno_id):
+        """
+        :param xml_path:
+        :param img_id:
+        :param anno_id:
+        :return: single image coco annotations
+        """
         tree = ET.parse(xml_path)
         root = tree.getroot()
         annotation = []
@@ -61,7 +81,13 @@ class Voc_to_coco:
         return annotation, anno_id
 
     def cvt_annotations(self, img_path, xml_path, out_file):
-        images = []  # img ann
+        """
+        :param img_path:
+        :param xml_path:
+        :param out_file:
+        :return: finally annotations
+        """
+        images = []  # img annotations
         annotations = []
 
         img_id = 1
@@ -84,11 +110,15 @@ class Voc_to_coco:
         for k, v in self.label_ids.items():
             categories.append({"name": k, "id": v})
         final_result = {"images": images, "annotations": annotations, "categories": categories}
-        with open(out_file, 'w') as f:
-            f.write(json.dumps(final_result))
+        with open(out_file, 'w') as w:
+            w.write(json.dumps(final_result))
         return annotations
 
     def __call__(self):
+        """
+        __call__用于类直接调用自身
+        :return:
+        """
         self.cvt_annotations(self.img_path, self.xml_path, self.out_file)
         logging.info('trans Done!')
 
