@@ -1,18 +1,38 @@
-on: [push]
+name: ci
+on:
+  push:
+    branches:
+      - 'main'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - 'main'
 
 jobs:
-  docker:
+  build:
     runs-on: ubuntu-latest
     steps:
-    - name: Docker Build Tag Publish
-      # You may pin to the exact commit or the version.
-      # uses: bitovi/github-actions-docker-publish@8db2834ce66baa4d849c7d87df3f47118233c993
-      run: cd ./docker/
-      uses: bitovi/github-actions-docker-publish@v1.0.2
-      with:
-        # Checkout the repository
-        checkout: true # optional, default is true
-        # Tag to override default Logic
-        image_tag: v1.0 # optional, default is 
-        # Use the SHA for the tag.  Overrides the default logic.
-        use_sha: false # optional, default is false
+          -
+            name: Checkout 
+            uses: actions/checkout@v2
+          -
+            name: Login to Docker Hub
+            uses: docker/login-action@v1
+            with:
+              username: ${{ secrets.DOCKER_HUB_USERNAME }}
+              password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          -
+            name: Set up Docker Buildx
+            uses: docker/setup-buildx-action@v1
+          -
+            name: Build and push
+            uses: docker/build-push-action@v2
+            with:
+              context: .
+              file: ./Dockerfile
+              builder: ${{ steps.buildx.outputs.name }}
+              push: true
+              tags: ${{ secrets.DOCKER_HUB_USERNAME }}/simplewhale:latest
+              cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/simplewhale:buildcache
+              cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/simplewhale:buildcache,mode=max
