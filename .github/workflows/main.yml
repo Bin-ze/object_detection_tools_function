@@ -10,7 +10,7 @@ jobs:
       uses: bitovi/github-actions-docker-publish@v1.0.2
       with:
         # Checkout the repository
-        checkout: true # optional, default is true
+        checkout: false # optional, default is true
         # Tag to override default Logic
         image_tag: v1.0 # optional, default is 
         # Use the SHA for the tag.  Overrides the default logic.
