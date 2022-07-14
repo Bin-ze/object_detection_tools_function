@@ -25,6 +25,7 @@ class Statistics_class:
         self.split = ['train', 'val', 'test']
         self.statistics_dict = dict()
         # self.classes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14']
+
     # yolo format
     def statistics_from_yolo_txt(self):
         """
@@ -68,6 +69,7 @@ class Statistics_class:
             test_set_result=test_set_cla
         )
         return self.statistics_dict
+
     # voc format
     def statistics_from_voc_xml(self):
         """
@@ -95,6 +97,7 @@ class Statistics_class:
 
         self.statistics_dict = dict(xml_statistics_result=statistics_)
         return self.statistics_dict
+
     # coco format
     def statistics_from_coco_json(self):
         """
@@ -114,6 +117,7 @@ class Statistics_class:
 
         self.statistics_dict = dict(json_statistics_result=statistics_)
         return self.statistics_dict
+
     # result sort
     def statistics_sort(self, dict_input, sort=False):
         """

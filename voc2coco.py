@@ -14,6 +14,7 @@ from PIL import Image
 '''
 xml format to json format 
 '''
+
 class Voc_to_coco:
 
     def __init__(self, xml_path, img_path, out_file):

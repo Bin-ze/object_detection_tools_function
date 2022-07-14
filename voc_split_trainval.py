@@ -49,6 +49,7 @@ class Voc_split_trainval:
         ftrain.close()
         fval.close()
         ftest.close()
+
     def __call__(self):
         self.split_trainval(trainval_percent=1, train_percent=0.9)
 

@@ -6,3 +6,5 @@
 用于随机划分voc格式的目标检测数据集的train set和val set
 ## voc2coco.py
 实现了voc数据集的xml格式到coco数据集的json格式的数据转换
+## mmdet_infer.py
+借助mmdeploy实现模型部署之后的模型推理流程，实现了包括推理，画框，可视化的流程
