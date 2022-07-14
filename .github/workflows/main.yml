@@ -1,0 +1,17 @@
+on: [push]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Docker Build Tag Publish
+      # You may pin to the exact commit or the version.
+      # uses: bitovi/github-actions-docker-publish@8db2834ce66baa4d849c7d87df3f47118233c993
+      uses: bitovi/github-actions-docker-publish@v1.0.2
+      with:
+        # Checkout the repository
+        checkout: true # optional, default is true
+        # Tag to override default Logic
+        image_tag: v1.0 # optional, default is 
+        # Use the SHA for the tag.  Overrides the default logic.
+        use_sha: false # optional, default is false
