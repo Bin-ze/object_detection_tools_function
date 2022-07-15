@@ -31,6 +31,14 @@ jobs:
           -
             name: Set up Docker Buildx
             uses: docker/setup-buildx-action@v1
+            
+          - 
+            name: Sanitize repo slug
+            uses: actions/github-script@v6
+            id: repo_slug
+            with:
+              result-encoding: string
+              script: return 'ghcr.io/${{ github.repository }}'.toLowerCase()   
           -
             name: Build and push
             uses: docker/build-push-action@v2
@@ -40,6 +48,7 @@ jobs:
               builder: ${{ steps.buildx.outputs.name }}
               push: true
               #tags: ${{ secrets.DOCKER_HUB_USERNAME }}/object_detection_tools_function:latest
-              tags: ghcr.io/binze/object_detection_tools_function:latest
-              cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/simplewhale:buildcache
-              cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/simplewhale:buildcache,mode=max
+              #tags: ghcr.io/binze/object_detection_tools_function:latest
+              tags: ${{ steps.repo_slug.outputs.result }}:latest
+              #cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/simplewhale:buildcache
+              #cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/simplewhale:buildcache,mode=max
