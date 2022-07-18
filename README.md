@@ -10,3 +10,5 @@
 借助mmdeploy实现模型部署之后的模型推理流程，实现了包括推理，画框，可视化的流程
 ## compute_pred_acc.py
 计算yolo标注的图像漏检以及错检文件，输出准确率指标
+## coco2txt.py
+coco数据集转yolo格式
