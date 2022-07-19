@@ -3,20 +3,32 @@ import json
 import sys
 import logging
 import argparse
-import cv2
 
 import numpy as np
 
 '''
 
 计算yolo txt 标注下的gt以及pred是否匹配，
-输入：gt txt  pred txt(自己生成，格式每行 'label_id,x,y,w,h')
+输入：gt txt  pred txt (自己生成，格式每行 'label_id,x,y,w,h,conf' )
+注：因为保存的txt默认为已经根据置信度conf项可有可无
 输出：txt文件保存准确率，以及漏检图片名称和分类错误图片名称
 
-'''
-class Cumpute_pred_label:
+测试情况：
+1 只有错检 true
+2 只有漏检 true
+3 既有错检又有漏检 true
 
-    def __init__(self, pred_path, label_path, conf_thres=0.5, result_sava_path='./'):
+logic：
+读取每张测试图片的gt_txt,pred_txt
+对于这样一对文件(对应单张图片的pred以及gt)，进行匹配计算：
+1 对于图片上的每一个gt，使用IOU匹配对应的pred,如果匹配成功，进入下一步(查看类别是否匹配),匹配失败，则记录漏检
+2 对于第一步匹配成功的pred,查看类别是否匹配，不匹配，则记录错检
+3 pop出已经匹配的pred标签，防止影响结果，接着进入下一次循环
+        
+'''
+class Cumpute_pred_acc:
+
+    def __init__(self, pred_path, label_path, iou_thres=0.5, result_sava_path='./'):
         """
 
         :param pred_path:
@@ -26,12 +38,13 @@ class Cumpute_pred_label:
         """
         self.pred_path = pred_path
         self.label_path = label_path
-        self.conf_thres = conf_thres
+        self.iou_thres = iou_thres
         self.count = 0
         self.total_gt = 0
         self.save_path = result_sava_path
         # 漏检
         self.miss = []
+        # 错检
         self.classify_error = []
 
     def compute_single_img(self, pred_txt, label_txt):
@@ -67,7 +80,7 @@ class Cumpute_pred_label:
 
             max_iou_index = np.argmax(bbox_iou)
             # 判断bbox是否匹配成功
-            if bbox_iou[0][max_iou_index] >= self.conf_thres:
+            if bbox_iou[0][max_iou_index] >= self.iou_thres:
                 # 判断label是否匹配成功
                 if label_instance.item() == pred_result[max_iou_index].item(0):
                     self.count += 1
@@ -80,8 +93,8 @@ class Cumpute_pred_label:
                     # 添加分类错误文件名
                     self.classify_error.append(pred_txt)
             else:
-                pred_result = np.delete(pred_result, max_iou_index, axis=0)
-                #self.miss.append(pred_txt)
+                # pred_result = np.delete(pred_result, max_iou_index, axis=0)
+                self.miss.append(pred_txt)
         return
 
     def compute(self):
@@ -90,6 +103,10 @@ class Cumpute_pred_label:
         :return:
         """
         label_ = sorted(os.listdir(self.pred_path))
+
+        # 测试图片总数
+        self.total_img_nums = len(label_)
+
         #label_ = sorted(os.listdir(self.label_path))
         for label in label_:
             pred_txt = os.path.join(self.pred_path, label)
@@ -101,28 +118,44 @@ class Cumpute_pred_label:
 
         :return:
         """
-        total_gt = dict(total_gt=self.total_gt)
-        assign_pred = dict(assign_pred=self.count)
-        dict_input = dict(total_gt=total_gt, assign_pred=assign_pred, acc=round(self.count/self.total_gt, 4))
+
+        # instance level统计结果
+        instance_level = dict(total_gt_nums=self.total_gt, match_pred_nums=self.count,
+                              instance_level_acc=round(self.count/self.total_gt, 4))
+        # 计算错误图片
+        error_img_nums = len(set(self.miss + self.classify_error))
+        # image level 统计结果
+        img_level = dict(total_img_nums=self.total_img_nums, correct_img_nums=self.total_img_nums - error_img_nums,
+                         img_level_acc=round((self.total_img_nums - error_img_nums)/self.total_img_nums, 4))
+
+        dict_input = dict(instance_level=instance_level,
+                          img_level=img_level)
+
         logging.info('json formatted output')
         if os.path.isfile(self.save_path): os.remove(self.save_path)
+
+        # 结果写入
         with open(self.save_path, 'a') as f:
             f.write(json.dumps(dict_input, indent=4))
 
-            f.write('\n漏检图片文件名:\n')
-            for miss in set(self.miss):
+            f.write('\n___漏检图片文件名:___\n')
+            for miss in sorted(set(self.miss)):
                 miss = miss.split('/')[-1].replace('txt','jpg')
                 f.write(miss+'\n')
 
-            f.write('错检图片文件名:\n')
-            for error in set(self.classify_error):
+            f.write('___错检图片文件名:___\n')
+            for error in sorted(set(self.classify_error)):
                 error = error.split('/')[-1].replace('txt', 'jpg')
                 f.write(error+'\n')
 
+
         logging.info(f'statistics result save in {self.save_path}')
-        print(f'total gt: {self.total_gt}')
-        print(f'assign pred: {self.count}')
-        print('acc: {:.3f}'.format(self.count/self.total_gt))
+        logging.info(f'total gt: {self.total_gt}')
+        logging.info(f'match pred: {self.count}')
+        logging.info(f'total img: {self.total_img_nums}')
+        logging.info(f'correct_img: {self.total_img_nums - error_img_nums}')
+        logging.info('instance_level_acc: {:.4f}'.format(self.count/self.total_gt))
+        logging.info('img_level_acc: {:.4f}'.format((self.total_img_nums - error_img_nums)/self.total_img_nums))
 
     @staticmethod
     def area(box):
@@ -159,7 +192,7 @@ class Cumpute_pred_label:
         y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
         return y
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self):
         self.compute()
         self.format_result()
 
@@ -168,10 +201,10 @@ if __name__ == '__main__':
                         stream=sys.stdout,
                         format="%(asctime)s | %(filename)s:%(lineno)d | %(levelname)s | %(message)s")
     parser = argparse.ArgumentParser()
-    parser.add_argument('--label_path', type=str, default='/object_detection/data/pinjie_data/coco/labels/test',help='gt txt save path')
-    parser.add_argument('--pred_path', type=str, default='/object_detection/yolov7/runs/test/exp2/labels',help='pred result txt save path')
+    parser.add_argument('--label_path', type=str, default='/home/guozebin/object_detection/data/pinjie_data/coco/labels/test',help='gt txt save path')
+    parser.add_argument('--pred_path', type=str, default='/home/guozebin/object_detection/yolov7/runs/detect/exp2/labels',help='pred result txt save path')
     parser.add_argument('--result_save_path', type=str, default='./result.txt', help='acc result and error and miss result save path')
     args = parser.parse_args()
     logging.info(args)
-    compute = Cumpute_pred_label(pred_path=args.pred_path, label_path=args.label_path, result_sava_path=args.result_save_path)
+    compute = Cumpute_pred_acc(pred_path=args.pred_path, label_path=args.label_path, result_sava_path=args.result_save_path)
     compute()
