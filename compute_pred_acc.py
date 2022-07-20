@@ -9,14 +9,15 @@ import numpy as np
 '''
 
 计算yolo txt 标注下的gt以及pred是否匹配，
-输入：gt txt  pred txt (自己生成，格式每行 'label_id,x,y,w,h,conf' )
-注：因为保存的txt默认为已经根据置信度conf项可有可无
+输入：gt txt  pred txt (自己生成，格式每行 'label_id,x,y,w,h,conf' or 'label_id,x,y,w,h')
+注：因为保存的txt为最终画图的结果，置信度conf项可有可无
 输出：txt文件保存准确率，以及漏检图片名称和分类错误图片名称
 
 测试情况：
 1 只有错检 true
 2 只有漏检 true
 3 既有错检又有漏检 true
+注：ture表示本地测试通过
 
 logic：
 读取每张测试图片的gt_txt,pred_txt
@@ -26,6 +27,7 @@ logic：
 3 pop出已经匹配的pred标签，防止影响结果，接着进入下一次循环
         
 '''
+
 class Cumpute_pred_acc:
 
     def __init__(self, pred_path, label_path, iou_thres=0.5, result_sava_path='./'):
@@ -201,8 +203,8 @@ if __name__ == '__main__':
                         stream=sys.stdout,
                         format="%(asctime)s | %(filename)s:%(lineno)d | %(levelname)s | %(message)s")
     parser = argparse.ArgumentParser()
-    parser.add_argument('--label_path', type=str, default='/home/guozebin/object_detection/data/pinjie_data/coco/labels/test',help='gt txt save path')
-    parser.add_argument('--pred_path', type=str, default='/home/guozebin/object_detection/yolov7/runs/detect/exp2/labels',help='pred result txt save path')
+    parser.add_argument('--label_path', type=str, default='./object_detection/data/pinjie_data/coco/labels/test',help='gt txt save path')
+    parser.add_argument('--pred_path', type=str, default='./object_detection/yolov7/runs/detect/exp2/labels',help='pred result txt save path')
     parser.add_argument('--result_save_path', type=str, default='./result.txt', help='acc result and error and miss result save path')
     args = parser.parse_args()
     logging.info(args)
