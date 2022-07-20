@@ -9,15 +9,16 @@ import numpy as np
 '''
 
 计算yolo txt 标注下的gt以及pred是否匹配，
-输入：gt txt  pred txt (自己生成，格式每行 'label_id,x,y,w,h,conf' or 'label_id,x,y,w,h')
-注：因为保存的txt为最终画图的结果，置信度conf项可有可无
+输入：gt txt  pred txt (自己生成，格式每行 'label_id,x,y,w,h,conf' )
+注：因为保存的txt默认为已经根据置信度conf项可有可无
 输出：txt文件保存准确率，以及漏检图片名称和分类错误图片名称
 
 测试情况：
 1 只有错检 true
 2 只有漏检 true
 3 既有错检又有漏检 true
-注：ture表示本地测试通过
+4 不匹配的多检 true
+注：true表示测试通过
 
 logic：
 读取每张测试图片的gt_txt,pred_txt
@@ -25,12 +26,13 @@ logic：
 1 对于图片上的每一个gt，使用IOU匹配对应的pred,如果匹配成功，进入下一步(查看类别是否匹配),匹配失败，则记录漏检
 2 对于第一步匹配成功的pred,查看类别是否匹配，不匹配，则记录错检
 3 pop出已经匹配的pred标签，防止影响结果，接着进入下一次循环
-        
+
 '''
+
 
 class Cumpute_pred_acc:
 
-    def __init__(self, pred_path, label_path, iou_thres=0.5, result_sava_path='./'):
+    def __init__(self, pred_path, label_path, iou_thres=0.65, result_sava_path='./'):
         """
 
         :param pred_path:
@@ -97,6 +99,9 @@ class Cumpute_pred_acc:
             else:
                 # pred_result = np.delete(pred_result, max_iou_index, axis=0)
                 self.miss.append(pred_txt)
+        # 如果遍历完gt,此时还有pred没有弹出，说明存在不匹配的错误检测
+        if pred_result.shape[0] != 0:
+            self.classify_error.append(pred_txt)
         return
 
     def compute(self):
@@ -109,7 +114,7 @@ class Cumpute_pred_acc:
         # 测试图片总数
         self.total_img_nums = len(label_)
 
-        #label_ = sorted(os.listdir(self.label_path))
+        # label_ = sorted(os.listdir(self.label_path))
         for label in label_:
             pred_txt = os.path.join(self.pred_path, label)
             label_txt = os.path.join(self.label_path, label)
@@ -123,12 +128,12 @@ class Cumpute_pred_acc:
 
         # instance level统计结果
         instance_level = dict(total_gt_nums=self.total_gt, match_pred_nums=self.count,
-                              instance_level_acc=round(self.count/self.total_gt, 4))
+                              instance_level_acc=round(self.count / self.total_gt, 4))
         # 计算错误图片
         error_img_nums = len(set(self.miss + self.classify_error))
         # image level 统计结果
         img_level = dict(total_img_nums=self.total_img_nums, correct_img_nums=self.total_img_nums - error_img_nums,
-                         img_level_acc=round((self.total_img_nums - error_img_nums)/self.total_img_nums, 4))
+                         img_level_acc=round((self.total_img_nums - error_img_nums) / self.total_img_nums, 4))
 
         dict_input = dict(instance_level=instance_level,
                           img_level=img_level)
@@ -142,22 +147,21 @@ class Cumpute_pred_acc:
 
             f.write('\n___漏检图片文件名:___\n')
             for miss in sorted(set(self.miss)):
-                miss = miss.split('/')[-1].replace('txt','jpg')
-                f.write(miss+'\n')
+                miss = miss.split('/')[-1].replace('txt', 'jpg')
+                f.write(miss + '\n')
 
             f.write('___错检图片文件名:___\n')
             for error in sorted(set(self.classify_error)):
                 error = error.split('/')[-1].replace('txt', 'jpg')
-                f.write(error+'\n')
-
+                f.write(error + '\n')
 
         logging.info(f'statistics result save in {self.save_path}')
         logging.info(f'total gt: {self.total_gt}')
         logging.info(f'match pred: {self.count}')
         logging.info(f'total img: {self.total_img_nums}')
         logging.info(f'correct_img: {self.total_img_nums - error_img_nums}')
-        logging.info('instance_level_acc: {:.4f}'.format(self.count/self.total_gt))
-        logging.info('img_level_acc: {:.4f}'.format((self.total_img_nums - error_img_nums)/self.total_img_nums))
+        logging.info('instance_level_acc: {:.4f}'.format(self.count / self.total_gt))
+        logging.info('img_level_acc: {:.4f}'.format((self.total_img_nums - error_img_nums) / self.total_img_nums))
 
     @staticmethod
     def area(box):
@@ -203,8 +207,8 @@ if __name__ == '__main__':
                         stream=sys.stdout,
                         format="%(asctime)s | %(filename)s:%(lineno)d | %(levelname)s | %(message)s")
     parser = argparse.ArgumentParser()
-    parser.add_argument('--label_path', type=str, default='./object_detection/data/pinjie_data/coco/labels/test',help='gt txt save path')
-    parser.add_argument('--pred_path', type=str, default='./object_detection/yolov7/runs/detect/exp2/labels',help='pred result txt save path')
+    parser.add_argument('--label_path', type=str, default='/mnt/data/guozebin/object_detection/yolov7/data/coco/labels/test',help='gt txt save path')
+    parser.add_argument('--pred_path', type=str, default='/mnt/data/guozebin/object_detection/yolov7/runs/detect/exp12/labels',help='pred result txt save path')
     parser.add_argument('--result_save_path', type=str, default='./result.txt', help='acc result and error and miss result save path')
     args = parser.parse_args()
     logging.info(args)
