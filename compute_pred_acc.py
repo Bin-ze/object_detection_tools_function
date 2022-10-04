@@ -3,9 +3,10 @@ import json
 import sys
 import logging
 import argparse
+import cv2
 
 import numpy as np
-
+import prettytable as pt
 '''
 
 计算yolo txt 标注下的gt以及pred是否匹配，
@@ -18,7 +19,6 @@ import numpy as np
 2 只有漏检 true
 3 既有错检又有漏检 true
 4 不匹配的多检 true
-注：true表示测试通过
 
 logic：
 读取每张测试图片的gt_txt,pred_txt
@@ -29,16 +29,36 @@ logic：
 
 '''
 
+class Colors:
+    # Ultralytics color palette https://ultralytics.com/
+    def __init__(self):
+        # hex = matplotlib.colors.TABLEAU_COLORS.values()
+        hex = ('FF3838', 'FF9D97', 'FF701F', 'FFB21D', 'CFD231', '48F90A', '92CC17', '3DDB86', '1A9334', '00D4BB',
+               '2C99A8', '00C2FF', '344593', '6473FF', '0018EC', '8438FF', '520085', 'CB38FF', 'FF95C8', 'FF37C7')
+        self.palette = [self.hex2rgb('#' + c) for c in hex]
+        self.n = len(self.palette)
+
+    def __call__(self, i, bgr=False):
+        c = self.palette[int(i) % self.n]
+        return (c[2], c[1], c[0]) if bgr else c
+
+    @staticmethod
+    def hex2rgb(h):  # rgb order (PIL)
+        return tuple(int(h[1 + i:1 + i + 2], 16) for i in (0, 2, 4))
+
+colors = Colors()
 
 class Cumpute_pred_acc:
 
-    def __init__(self, pred_path, label_path, iou_thres=0.65, result_sava_path='./'):
+    def __init__(self, pred_path, label_path, iou_thres=0.4, result_sava_path='./', classes_dict=None, mask=None):
         """
 
         :param pred_path:
         :param label_path:
-        :param conf_thres:
+        :param iou_thres:
         :param result_sava_path:
+        :param classes_dict: ZH_dict output
+        :param mask: In the display result is to remove the corresponding category
         """
         self.pred_path = pred_path
         self.label_path = label_path
@@ -50,6 +70,38 @@ class Cumpute_pred_acc:
         self.miss = []
         # 错检
         self.classify_error = []
+        #
+        if classes_dict is not None:
+            self.classes_dict = {k:v for v, k in classes_dict.items()}
+        else:
+            self.classes_dict = None
+
+        # mask
+        self.mask = mask
+    
+    # 添加了类别过滤功能，可以计算需要的类别的准确率
+    def mask_category(self, pred, label):
+        new_label = []
+        new_pred = []
+        for i in label:
+            if i[0] not in self.mask:
+                new_label.append(i)
+        for j in pred:
+            if j[0] not in self.mask:
+                new_pred.append(j)
+
+        if not (new_pred and new_label):
+            if new_pred == [] and new_label != []:
+                new_pred = np.array([])
+                return new_pred, np.stack(new_label)
+
+            if new_label == []:
+                new_label = np.array([])
+
+                return np.stack(new_pred), new_label
+
+        return np.stack(new_pred), np.stack(new_label)
+
 
     def compute_single_img(self, pred_txt, label_txt):
         """
@@ -69,12 +121,18 @@ class Cumpute_pred_acc:
             pred_result = pred_result[:, :-1]
 
         label_result = np.array(label_result, dtype=np.float32)
+
+        # Remove categories that do not need to be calculated
+        if isinstance(self.mask, list):
+            pred_result, label_result = self.mask_category(pred_result, label_result)
+
         # update total_gt_nums
         self.total_gt += label_result.shape[0]
         # 开始计算
         for instance in label_result:
             # 当pred的结果全部弹出，则退出循环
             if pred_result.shape[0] == 0:
+                self.add_description_miss(pred_txt, instance[None, :1])
                 self.miss.append(pred_txt)
                 break
 
@@ -92,16 +150,47 @@ class Cumpute_pred_acc:
                     pred_result = np.delete(pred_result, max_iou_index, axis=0)
 
                 else:
-
+                    self.add_description_error(pred_txt, label_instance, pred_result[max_iou_index].item(0))
                     pred_result = np.delete(pred_result, max_iou_index, axis=0)
                     # 添加分类错误文件名
                     self.classify_error.append(pred_txt)
             else:
                 # pred_result = np.delete(pred_result, max_iou_index, axis=0)
+                self.add_description_miss(pred_txt, label_instance)
+
                 self.miss.append(pred_txt)
         # 如果遍历完gt,此时还有pred没有弹出，说明存在不匹配的错误检测
         if pred_result.shape[0] != 0:
-            self.classify_error.append(pred_txt)
+            #self.classify_error.append(pred_txt)
+            pass
+        return
+
+    def add_description_miss(self, pred_txt, label_instance):
+        """
+
+        """
+        if self.classes_dict is not None:
+            info_img = pred_txt.split('/')[-1].replace('txt', 'jpg')
+            info = f'{info_img}: {self.classes_dict[int(label_instance.item())]} 被漏检'
+            logging.info(info)
+        else:
+            info_img = pred_txt.split('/')[-1].replace('txt', 'jpg')
+            info = f'{info_img}: {str(int(label_instance.item()))} 被漏检'
+            logging.info(info)
+        return
+
+    def add_description_error(self, pred_txt, label_instance, pred_label):
+        """
+
+        """
+        if self.classes_dict is not None:
+            info_img = pred_txt.split('/')[-1].replace('txt', 'jpg')
+            info = f'{info_img}: {self.classes_dict[int(label_instance.item())]} 被错检为 {self.classes_dict[int(pred_label)]}'
+            logging.info(info)
+        else:
+            info_img = pred_txt.split('/')[-1].replace('txt', 'jpg')
+            info = f'{info_img}: {str(int(label_instance.item()))} 被错检为 {int(pred_label)}'
+            logging.info(info)
         return
 
     def compute(self):
@@ -136,7 +225,9 @@ class Cumpute_pred_acc:
                          img_level_acc=round((self.total_img_nums - error_img_nums) / self.total_img_nums, 4))
 
         dict_input = dict(instance_level=instance_level,
-                          img_level=img_level)
+                          img_level=img_level,
+                          Missing_detection_rate=len(set(self.miss)) / self.total_img_nums,
+                          False_detection_rate=(len(set(self.classify_error))) / self.total_img_nums)
 
         logging.info('json formatted output')
         if os.path.isfile(self.save_path): os.remove(self.save_path)
@@ -155,13 +246,12 @@ class Cumpute_pred_acc:
                 error = error.split('/')[-1].replace('txt', 'jpg')
                 f.write(error + '\n')
 
-        logging.info(f'statistics result save in {self.save_path}')
-        logging.info(f'total gt: {self.total_gt}')
-        logging.info(f'match pred: {self.count}')
-        logging.info(f'total img: {self.total_img_nums}')
-        logging.info(f'correct_img: {self.total_img_nums - error_img_nums}')
-        logging.info('instance_level_acc: {:.4f}'.format(self.count / self.total_gt))
-        logging.info('img_level_acc: {:.4f}'.format((self.total_img_nums - error_img_nums) / self.total_img_nums))
+        tb = pt.PrettyTable()
+        tb.field_names = ['statistics result save path', 'total gt', 'match pred', 'total img', 'correct_img', 'instance_level_acc', 'img_level_acc', 'Missing detection rate', 'False detection rate']
+        tb.add_row([self.save_path, self.total_gt, self.count, self.total_img_nums, self.total_img_nums - error_img_nums, round(self.count / self.total_gt, 4),
+                    round((self.total_img_nums - error_img_nums) / self.total_img_nums, 4), round((len(set(self.miss))) / self.total_img_nums, 4),round(len(set(self.classify_error)) / self.total_img_nums, 4)])
+        print(tb)
+        return
 
     @staticmethod
     def area(box):
@@ -198,6 +288,56 @@ class Cumpute_pred_acc:
         y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
         return y
 
+    @staticmethod
+    # The image size is fixed here. If the size of each image is different, you need to modify the value here
+    def denorm_yolo(box, wh=(1000, 720)):
+
+        bbox = box.copy()
+        bbox[:, 1] *= wh[0]
+        bbox[:, 2] *= wh[1]
+        bbox[:, 3] *= wh[0]
+        bbox[:, 4] *= wh[1]
+
+        return bbox
+
+    def plot_bbox(self, txt_path, img_path, save_path='../visualization/', view_img=False, imwrite=True):
+        with open(txt_path, 'r') as f:
+            plot_label = [x.split() for x in f.read().strip().splitlines()]
+
+        bboxes = np.array(plot_label, dtype=np.float32)
+        labels = bboxes[:, 0]
+        # denorm
+        bboxes = self.denorm_yolo(bboxes)
+        bboxes = bboxes[:, 1:]
+        bboxes = self.xywh2xyxy(bboxes)
+
+        img = cv2.imread(img_path)
+        # plot and save result
+        for box, label in zip(bboxes, labels):
+            color = colors(label)
+            label = f'{label}'
+
+            # 先画框
+            p1, p2 = (int(box[0]), int(box[1])), (int(box[2]), int(box[3]))
+            cv2.rectangle(img, p1, p2, color, thickness=2, lineType=cv2.LINE_AA)
+
+            if label:
+                w, h = cv2.getTextSize(label, 0, fontScale=1, thickness=1)[0]  # text width, height
+                outside = p1[1] - h - 3 >= 0  # label fits outside box
+                p2 = p1[0] + w, p1[1] - h - 3 if outside else p1[1] + h + 3
+                cv2.rectangle(img, p1, p2, color, -1, cv2.LINE_AA)  # filled
+                cv2.putText(img, label, (p1[0], p1[1] - 2 if outside else p1[1] + h + 2), 0, 1, (255, 255, 255),
+                            thickness=1, lineType=cv2.LINE_AA)
+
+            if view_img:
+                cv2.imshow(str(save_path + img_path), img)
+                cv2.waitKey(1)  # 1 millisecond
+
+            if imwrite:
+                image_path = img_path.split('/')[-1]
+                cv2.imwrite('{}/{}'.format(save_path, image_path), img)
+                logging.info(f'save image {image_path} to {save_path}')
+
     def __call__(self):
         self.compute()
         self.format_result()
@@ -207,10 +347,21 @@ if __name__ == '__main__':
                         stream=sys.stdout,
                         format="%(asctime)s | %(filename)s:%(lineno)d | %(levelname)s | %(message)s")
     parser = argparse.ArgumentParser()
-    parser.add_argument('--label_path', type=str, default='/mnt/data/guozebin/object_detection/yolov7/data/coco/labels/test',help='gt txt save path')
-    parser.add_argument('--pred_path', type=str, default='/mnt/data/guozebin/object_detection/yolov7/runs/detect/exp12/labels',help='pred result txt save path')
-    parser.add_argument('--result_save_path', type=str, default='./result.txt', help='acc result and error and miss result save path')
+    parser.add_argument('--label_path', type=str, default='/mnt/data/guozebin/fake_real_data_merge/0302/coco/labels/val/', help='gt txt save path')
+    parser.add_argument('--pred_path', type=str, default='/mnt/data/guozebin/object_detection/yolov7/runs/detect/exp/yolov7x_merge/labels/', help='pred result txt save path')
+    parser.add_argument('--result_save_path', type=str, default='./yolov7_0302.txt', help='acc result and error and miss result save path')
     args = parser.parse_args()
     logging.info(args)
-    compute = Cumpute_pred_acc(pred_path=args.pred_path, label_path=args.label_path, result_sava_path=args.result_save_path)
+
+    #classes_dict = {'红烧大排': 1, '蚝油牛肉': 2, '干锅鸡': 3, '红烧狮子头': 4, '素鸡小烧肉': 5, '蒜蓉肉丝': 6 ,'莴笋炒蛋':7 ,'鱼香茄子':8, '麻婆豆腐': 9, '芹菜百叶司': 10, '老南瓜': 11, '大白菜油豆腐': 12, '冰红茶':13, '老酸奶':14}
+    compute = Cumpute_pred_acc(pred_path=args.pred_path, label_path=args.label_path, result_sava_path=args.result_save_path, mask=None)
     compute()
+
+    # # test plot
+    # img_path = '/mnt/data/guozebin/object_detection/yolov7/data/coco/images/val/'
+    # txt_path = args.pred_path
+    # assert len(os.listdir(img_path)) == len(os.listdir(txt_path)), 'When batch drawing, the number of labels and the number of pictures must match!'
+    # for img, gt in zip(sorted(os.listdir(img_path)),sorted(os.listdir(txt_path))):
+    #     img_paths = os.path.join(img_path, gt.replace('txt','jpg'))
+    #     gt_txt_paths = os.path.join(txt_path, gt)
+    #     compute.plot_bbox(img_path=img_paths, txt_path=gt_txt_paths, save_path='../visualization/')
