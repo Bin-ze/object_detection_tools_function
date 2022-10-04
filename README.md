@@ -22,7 +22,7 @@
 描述：用于实现单天菜品到整个菜品数据集的映射
 ## val_14class_to_120class.py
 描述：用于实现单天14类标注到120类整个数据集标注的标签转换
-# voc2yolo.py
+## voc2yolo.py
 描述：用于voc的xml标注到yolo的txt标注的转换
-# json_to_yolopose.py
+## json_to_yolopose.py
 描述：用于将json标注的关键点转化为yolopose格式
