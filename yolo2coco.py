@@ -188,7 +188,7 @@ class YOLOToCOCO(object):
                 'iscrowd': 0,
                 'image_id': img_id,
                 'bbox': bbox,
-                'category_id': int(category_id)+1,
+                'category_id': int(category_id),
                 'id': self.annotation_id,
             })
             self.annotation_id += 1
