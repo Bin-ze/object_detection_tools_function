@@ -1,5 +1,7 @@
 # object_detection_tools_function
 描述：一些目标检测任务需要用到的数据转换以及常见数据处理函数
+## distributed_demo.py
+描述： 一个简单的分布式训练教程，使用它可以拓展您的算法进行分布式训练加速，用起来吧
 ##  statistics_class.py
 描述：用于对 xml(voc)，json(coco)，txt(yolo) 格式的数据集的每个类别的数量进行统计，并输出json
 ## voc_split_trainval.py
