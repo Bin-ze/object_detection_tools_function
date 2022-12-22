@@ -1,6 +1,10 @@
 import os
 import argparse
+
 class Handle_yolo:
+    """
+    该类用于生成yolo所需要的train.txt, val.txt，test.txt文件
+    """
     def __init__(self, root_path):
         self.path = root_path
 

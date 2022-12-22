@@ -5,7 +5,12 @@ import numpy as np
 import json
 import sys
 sys.path.append("/mnt/data/guozebin/object_detection/")
-from yolov7.my_utils.statistics_class import Statistics_class
+from statistics_class import Statistics_class
+
+"""
+用于将yolo格式的目标检测数据集转换为分类数据集合适，并写了一些策略，比如使用find_max_real_class_numbers函数去计算数据集中每个类的实例个数，
+从而制定分类数据集样本平衡方案。
+"""
 
 # create index for all classes
 def create_index():

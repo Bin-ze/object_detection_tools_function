@@ -8,6 +8,9 @@ import cv2
 import numpy as np
 import prettytable as pt
 '''
+一种自定义的评价指标：
+instance_level_acc：评估目标检测的准确率
+img_level_acc: 评估所有样本都检测正确的图像占图像总个数的比例
 
 计算yolo txt 标注下的gt以及pred是否匹配，
 输入：gt txt  pred txt (自己生成，格式每行 'label_id,x,y,w,h,conf' )

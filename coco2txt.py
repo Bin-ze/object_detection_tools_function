@@ -5,7 +5,9 @@ import argparse
 import sys
 
 from tqdm import tqdm
-
+"""
+用于将coco数据集转换为yolo格式
+"""
 
 def convert(size, box):
     """
